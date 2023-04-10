@@ -77,7 +77,7 @@ gravity = vec2(0, -9.81)
 canvassize = (800, 500)
 pixels = vec3.field(shape=canvassize)
 
-endscreentext = int8_t.field(shape=(256, 4))
+endscreentext = int8_t.field(shape=(256, 10))
 endscreentext.fill(0)
 with IM.open("chassis.png") as chassis0:
     chassis1 = np.array(chassis0)
@@ -364,7 +364,7 @@ while gui.running and alive:
 if (gui.running):
     drawBackground(car.x)
     drawCar(car.x, car.phi, car.wlocdiff)
-    text = f"Distance: {car.x[0]:5.4g}\nFlips: {flips}\nBackflips: {backflips}"
+    text = f"Distance: {car.x[0]:5.4g}\nFlips: {flips}\nBackflips: {backflips}\n\nPress escape\nto quit game"
     coords = [0, 0]
     for c in text:
         if (c == '\n'):
@@ -378,7 +378,7 @@ if (gui.running):
     gui.show()
     time.sleep(2)
     while (gui.get_event(ti.GUI.PRESS)): True
-    while (not gui.get_event(ti.GUI.PRESS)):
+    while (not (gui.get_event(ti.GUI.PRESS) and gui.event.key == 'Escape')):
         time.sleep(0.05)
         gui.show()
 gui.close()
