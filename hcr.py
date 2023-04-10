@@ -7,16 +7,16 @@ from PIL import Image as IM
 ti.init(arch=ti.gpu)
 
 @ti.func
-def smoothNoiseTi(x : float) -> float:
+def terrainNoiseTi(x : float) -> float:
     h = ti.sin(0.3 * x) + ti.cos(0.5 * x) + 3 * ti.sin(0.1 * x) + 5 * ti.sin(0.03 * x) + 0.2 * ti.sin(0.9 * x)
     return 0.005 * x * h
 
-def smoothNoisePy(x : float) -> float:
+def terrainNoisePy(x : float) -> float:
     h = ti.sin(0.3 * x) + ti.cos(0.5 * x) + 3 * ti.sin(0.1 * x) + 5 * ti.sin(0.03 * x) + 0.2 * ti.sin(0.9 * x)
     return 0.005 * x * h
 
-def dSmoothNoisedx(x : float, dx : float = 0.05) -> float:
-    f = (smoothNoisePy(x + dx * 0.5) - smoothNoisePy(x - dx * 0.5)) / dx
+def dTerrainNoisedx(x : float, dx : float = 0.05) -> float:
+    f = (terrainNoisePy(x + dx * 0.5) - terrainNoisePy(x - dx * 0.5)) / dx
     if (f == 0):
         return 0.00000000001
     return f
@@ -26,6 +26,7 @@ vec2 = ti.types.vector(2, float)
 vec3 = ti.types.vector(3, float)
 vec4 = ti.types.vector(4, float)
 ivec2 = ti.types.vector(2, int)
+uvec2 = ti.types.vector(2, ti.u32)
 @ti.func
 def genRotMatTi(phi : float) -> mat2:
     return mat2(ti.cos(phi), ti.sin(phi), -ti.sin(phi), ti.cos(phi))
@@ -92,14 +93,39 @@ screenOffset = vec2(-200, -200)
 def col(r : float, g : float, b : float):
     return ti.Vector([r, g, b])
 
+@ti.func
+def hash22(x : int, y : int) -> vec2:
+    q = uvec2(x, y)
+    q *= uvec2(ti.u32(1597334673), ti.u32(3812015801))
+    q = (q.x ^ q.y) * uvec2(ti.u32(1597334673), ti.u32(3812015801))
+    return vec2(q) * (1.0 / 4294967295.0);
+
 @ti.kernel
 def drawBackground(car_x : vec2):
     for i, j in pixels:
-        loc = pixelsize * (vec2(i, j) + screenOffset) + car_x * vec2(1, 0.5)
+        loc = pixelsize * (vec2(i, j) + screenOffset) + car_x * vec2(1, 0.8)
         color = vec3(-0.06 * loc[1] + 0.3, -0.04 * loc[1] + 0.5, 0.01 * loc[1] + 1.0)
-        height = loc[1] - smoothNoiseTi(loc[0])
+        height = loc[1] - terrainNoiseTi(loc[0])
         if (height < 0):
-            color = vec3(0.3, 0.4, 0.1)
+            color = vec3(0.2, 0.4, 0.1) * 0.2 * (height + 6)
+            grassheight = ti.sin(2 * loc[0]) * 0.3 - 0.7
+            if (height < grassheight):
+                color = vec3(0.5, 0.3, 0.2)
+                heightDarkenFactor = 0.05
+                #pebbles
+                tilecoord = ti.floor(loc * 0.3)
+                localcoord = (loc * 0.3 - tilecoord) * 2 - 1
+                localcoord += 0.7 * (hash22(int(tilecoord.x + 1000.5), int(tilecoord.y + 1000.5)) * 2 - 1)
+                randMat = mat2(hash22(int(tilecoord.x + 1012.5), int(tilecoord.y + 1402.5)) + 0.75, hash22(int(tilecoord.x + 1180.5), int(tilecoord.y + 1292.5)) * 0.5 - 0.25)
+                randMat = mat2(randMat[0, 0] * ti.math.sign(randMat[1, 0]), randMat[1, 1], randMat[1, 0], randMat[0, 1])
+                localcoord = randMat @ localcoord
+                pebbleSize = 0.15 + 0.02 * abs(height)
+                localcoord = 0.2 * ti.floor(5 * localcoord / pebbleSize)
+                locallen = localcoord.norm()
+                if (locallen < 1.0):
+                    heightDarkenFactor = 0.04
+                    color = vec3(0.2 * localcoord.y + 0.7 - (0.5 * locallen) ** 2)
+                color *= ti.exp(heightDarkenFactor * height)
         pixels[i, j] = color
 
 @ti.kernel
@@ -107,7 +133,7 @@ def drawCar(car_x : vec2, car_phi : float, car_wlocdiff : vec2):
     rotMat = genRotMatTi(car_phi)
     tireRotMat = genRotMatTi(-car_x[0] / car.wrad)
     for i, j in pixels:
-        loc = pixelsize * (vec2(i, j) + screenOffset) + car_x * vec2(1, 0.5)
+        loc = pixelsize * (vec2(i, j) + screenOffset) + car_x * vec2(1, 0.8)
         relloc = rotMat @ (loc - car_x)
         #body
         brelloc = (relloc - car.lower) / (car.upper - car.lower)
@@ -151,7 +177,7 @@ def moveCar(dt = 0.0166):
     v += gravity * dt
     rotMat = genRotMatPy(-car.phi)
     driver = rotMat @ car.driver + car.x
-    if (smoothNoisePy(driver.x) > driver.y - 0.3):
+    if (terrainNoisePy(driver.x) > driver.y - 0.3):
         global alive
         alive = False
     prevRotMat = genRotMatPy(-oldphi)
@@ -163,8 +189,8 @@ def moveCar(dt = 0.0166):
         wheelloc = vec2(car.wloc[k, 0], car.wloc[k, 1])
         prevwheelloc = prevRotMat @ wheelloc + oldx
         wheelloc = rotMat @ wheelloc + car.x
-        height = smoothNoisePy(wheelloc[0])
-        steepness = dSmoothNoisedx(wheelloc[0])
+        height = terrainNoisePy(wheelloc[0])
+        steepness = dTerrainNoisedx(wheelloc[0])
         normal = vec2(1, -1 / steepness)
         normal /= normal.norm()
         if (normal[1] < 0.0):
@@ -182,7 +208,7 @@ def moveCar(dt = 0.0166):
                 midair = False
                 w += 0.5 * force / car.J * car.wloc[k, 0]
                 v += force / car.m * normal
-                aextra =  min(30 * max(0, abs(car.rpm) - np.dot(fwdir, v) * np.sign(car.rpm)), car.traction * force) * np.sign(car.rpm)
+                aextra =  min(30 * max(0, abs(car.rpm) - abs(np.dot(fwdir, v))), car.traction * force) * np.sign(car.rpm)
                 v += dt * aextra * fwdir
             car.wlocdiff[k] = -dist
         else:
@@ -200,8 +226,8 @@ def moveCar(dt = 0.0166):
         for j in range(2):
             thisCorner0 = vec2(bounds[i, 0], bounds[j, 1])
             thisCorner = rotMat @ thisCorner0 + car.x + dt * v
-            height = smoothNoisePy(thisCorner[0])
-            steepness = dSmoothNoisedx(thisCorner[0])
+            height = terrainNoisePy(thisCorner[0])
+            steepness = dTerrainNoisedx(thisCorner[0])
             normal = vec2(1, -1 / steepness)
             normal /= normal.norm()
             if (normal[1] < 0.0):
