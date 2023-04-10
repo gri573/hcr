@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import taichi as ti
+import time
 import numpy as np
 from PIL import Image as IM
 
@@ -27,6 +28,8 @@ vec3 = ti.types.vector(3, float)
 vec4 = ti.types.vector(4, float)
 ivec2 = ti.types.vector(2, int)
 uvec2 = ti.types.vector(2, ti.u32)
+int8_t = ti.types.vector(1, ti.i8)
+uint = ti.types.vector(1, ti.u32)
 @ti.func
 def genRotMatTi(phi : float) -> mat2:
     return mat2(ti.cos(phi), ti.sin(phi), -ti.sin(phi), ti.cos(phi))
@@ -40,7 +43,7 @@ class car_t:
         m = 5.0,
         lower = vec2(-1.5, 0.2),
         upper = vec2(1.5, 1.2),
-        driver = vec2(0, 1.7),
+        driver = vec2(0.4, 1.2),
         k = 4.0,
         gamma = 30.0,
         traction = 20.0,
@@ -51,8 +54,8 @@ class car_t:
         self.prevx = self.x
         self.rpm = 0.0
         self.hp = 3.0
-        self.phi = 0.0
-        self.prevphi = 0.0
+        self.phi = 0
+        self.prevphi = self.phi
         self.wlocdiff = vec2(0, 0)
         self.m = m
         self.J = m / 12 * ((upper[0] - lower[0]) ** 2 + (upper[1] - lower[1]) ** 2)
@@ -73,6 +76,9 @@ gravity = vec2(0, -9.81)
 
 canvassize = (800, 500)
 pixels = vec3.field(shape=canvassize)
+
+endscreentext = int8_t.field(shape=(256, 4))
+endscreentext.fill(0)
 with IM.open("chassis.png") as chassis0:
     chassis1 = np.array(chassis0)
     chassis = vec4.field(shape=chassis1.shape[:2])
@@ -152,6 +158,90 @@ def drawCar(car_x : vec2, car_phi : float, car_wlocdiff : vec2):
                 wheelcoords = ivec2(tire.shape * wheelloc.yx)
                 col = tire[wheelcoords]
                 if (col.a > 0.5): pixels[i, j] = col.rgb
+        #if ((relloc - car.driver).norm() < 0.3): pixels[i, j] = vec3(0, 0, 1)
+chars = uint.field(shape=(128,))
+chars[65]    = uint(0x747f18c4)
+chars[66]    = uint(0xf47d18f8)
+chars[67]    = uint(0x746108b8)
+chars[68]    = uint(0xf46318f8)
+chars[69]    = uint(0xfc39087c)
+chars[70]    = uint(0xfc390840)
+chars[71]    = uint(0x7c2718b8)
+chars[72]    = uint(0x8c7f18c4)
+chars[73]    = uint(0x71084238)
+chars[74]    = uint(0x084218b8)
+chars[75]    = uint(0x8cb928c4)
+chars[76]    = uint(0x8421087c)
+chars[77]    = uint(0x8eeb18c4)
+chars[78]    = uint(0x8e6b38c4)
+chars[79]    = uint(0x746318b8)
+chars[80]    = uint(0xf47d0840)
+chars[81]    = uint(0x74631934)
+chars[82]    = uint(0xf47d18c4)
+chars[83]    = uint(0x7c1c18b8)
+chars[84]    = uint(0xf9084210)
+chars[85]    = uint(0x8c6318b8)
+chars[86]    = uint(0x8c62a510)
+chars[87]    = uint(0x8c635dc4)
+chars[88]    = uint(0x8a88a8c4)
+chars[89]    = uint(0x8a884210)
+chars[90]    = uint(0xf844447c)
+chars[97]    = uint(0x0382f8bc)
+chars[98]    = uint(0x85b318f8)
+chars[99]    = uint(0x03a308b8)
+chars[100]   = uint(0x0b6718bc)
+chars[101]   = uint(0x03a3f83c)
+chars[102]   = uint(0x323c8420)
+chars[103]   = uint(0x03e2f0f8)
+chars[104]   = uint(0x842d98c4)
+chars[105]   = uint(0x40308418)
+chars[106]   = uint(0x080218b8)
+chars[107]   = uint(0x4254c524)
+chars[108]   = uint(0x6108420c)
+chars[109]   = uint(0x06ab5ac4)
+chars[110]   = uint(0x07a318c4)
+chars[111]   = uint(0x03a318b8)
+chars[112]   = uint(0x05b31f40)
+chars[113]   = uint(0x03671784)
+chars[114]   = uint(0x05b30840)
+chars[115]   = uint(0x03e0e0f8)
+chars[116]   = uint(0x211c420c)
+chars[117]   = uint(0x046318bc)
+chars[118]   = uint(0x04631510)
+chars[119]   = uint(0x04635abc)
+chars[120]   = uint(0x04544544)
+chars[121]   = uint(0x0462f0f8)
+chars[122]   = uint(0x07c4447c)
+chars[48]    = uint(0x746b58b8)
+chars[49]    = uint(0x23084238)
+chars[50]    = uint(0x744c88fc)
+chars[51]    = uint(0x744c18b8)
+chars[52]    = uint(0x19531f84)
+chars[53]    = uint(0xfc3c18b8)
+chars[54]    = uint(0x3221e8b8)
+chars[55]    = uint(0xfc422210)
+chars[56]    = uint(0x745d18b8)
+chars[57]    = uint(0x745e1130)
+chars[32]    = uint(0x0000000)
+chars[46]    = uint(0x000010)
+chars[45]    = uint(0x0000e000)
+chars[44]    = uint(0x00000220)
+chars[58]    = uint(0x02000020)
+
+@ti.kernel
+def drawEndScreen():
+    for i, j in pixels:
+        pixels[i, j] *= 0.5
+        tilecoords0 = ivec2(vec2(i, canvassize[1] - j) - 0.25 * vec2(canvassize))
+        if (min(tilecoords0.x, tilecoords0.y) >= 0):
+            tilecoords0 //= 4
+            tilecoords = tilecoords0 // ivec2(6, 10)
+            localcoords = tilecoords0 % ivec2(6, 10)
+            if (tilecoords.x < endscreentext.shape[0] and tilecoords.y < endscreentext.shape[1] and localcoords.x < 5 and localcoords.y < 6):
+                if (endscreentext[tilecoords].x != 0):
+                    coordint = (6 - localcoords.x) + 5 * (5 - localcoords.y)
+                    if ((chars[endscreentext[tilecoords].x].x >> coordint) % 2 != 0):
+                        pixels[i, j] = vec3(1)
 
 bounds = mat2(car.lower, car.upper)
 alive = True
@@ -271,6 +361,25 @@ while gui.running and alive:
     handleInputs()
     gui.set_image(pixels)
     gui.show()
-
+if (gui.running):
+    drawBackground(car.x)
+    drawCar(car.x, car.phi, car.wlocdiff)
+    text = f"Distance: {car.x[0]:5.4g}\nFlips: {flips}\nBackflips: {backflips}"
+    coords = [0, 0]
+    for c in text:
+        if (c == '\n'):
+            coords[0] = 0
+            coords[1] += 1
+        else:
+            endscreentext[tuple(coords)] = int8_t(ord(c))
+            coords[0] += 1
+    drawEndScreen()
+    gui.set_image(pixels)
+    gui.show()
+    time.sleep(2)
+    while (gui.get_event(ti.GUI.PRESS)): True
+    while (not gui.get_event(ti.GUI.PRESS)):
+        time.sleep(0.05)
+        gui.show()
 gui.close()
 print(f"\nDistance: {car.x[0]}\nFlips: {flips}\nBackflips: {backflips}")
