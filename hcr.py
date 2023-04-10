@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import taichi as ti
 import numpy as np
 from PIL import Image as IM
@@ -96,7 +98,7 @@ def drawBackground(car_x : vec2):
         loc = pixelsize * (vec2(i, j) + screenOffset) + car_x * vec2(1, 0.5)
         color = vec3(-0.06 * loc[1] + 0.3, -0.04 * loc[1] + 0.5, 0.01 * loc[1] + 1.0)
         height = loc[1] - smoothNoiseTi(loc[0])
-        if ():
+        if (height < 0):
             color = vec3(0.3, 0.4, 0.1)
         pixels[i, j] = color
 
@@ -225,11 +227,11 @@ gui = ti.GUI('hcr', canvassize, fast_gui = True)
 
 def handleInputs():
     while (gui.get_event(ti.GUI.PRESS)):
-        if gui.event.key == 'Right':
+        if (gui.event.key == 'Right'):
             car.rpm += car.hp
-        elif gui.event.key == 'Left':
+        elif (gui.event.key == 'Left'):
             car.rpm -= car.hp
-        elif gui.event.key == 'Escape':
+        elif (gui.event.key == 'Escape'):
             gui.close()
             print("")
             exit()
