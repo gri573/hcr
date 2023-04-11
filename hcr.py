@@ -43,6 +43,7 @@ class car_t:
         m = 5.0,
         lower = vec2(-1.5, 0.2),
         upper = vec2(1.5, 1.2),
+        collisionpoints = (vec2(0), vec2(1, 0), vec2(1, 0.5), vec2(0.66, 1), vec2(0.28, 1), vec2(0, 0.5)),
         driver = vec2(0.4, 1.2),
         k = 4.0,
         gamma = 30.0,
@@ -61,6 +62,7 @@ class car_t:
         self.J = m / 12 * ((upper[0] - lower[0]) ** 2 + (upper[1] - lower[1]) ** 2)
         self.lower = lower
         self.upper = upper
+        self.collisionpoints = tuple([point * (self.upper - self.lower) + self.lower for point in collisionpoints])
         self.driver = driver
         self.k = k
         self.gamma = gamma
@@ -110,7 +112,8 @@ def hash22(x : int, y : int) -> vec2:
 def drawBackground(car_x : vec2):
     for i, j in pixels:
         loc = pixelsize * (vec2(i, j) + screenOffset) + car_x * vec2(1, 0.8)
-        color = vec3(-0.06 * loc[1] + 0.3, -0.04 * loc[1] + 0.5, 0.01 * loc[1] + 1.0)
+        skyloc = loc - 0.5 * car_x * vec2(1, 0.8)
+        color = vec3(-0.06 * skyloc[1] + 0.3, -0.04 * skyloc[1] + 0.5, 0.01 * skyloc[1] + 1.0)
         height = loc[1] - terrainNoiseTi(loc[0])
         if (height < 0):
             color = vec3(0.2, 0.4, 0.1) * 0.2 * (height + 6)
@@ -267,7 +270,7 @@ def moveCar(dt = 0.0166):
     v += gravity * dt
     rotMat = genRotMatPy(-car.phi)
     driver = rotMat @ car.driver + car.x
-    if (terrainNoisePy(driver.x) > driver.y - 0.3):
+    if (terrainNoisePy(driver[0]) > driver[1] - 0.3):
         global alive
         alive = False
     prevRotMat = genRotMatPy(-oldphi)
@@ -312,26 +315,25 @@ def moveCar(dt = 0.0166):
     #body collision
     newx = car.x
     newphi = car.phi
-    for i in range(2):
-        for j in range(2):
-            thisCorner0 = vec2(bounds[i, 0], bounds[j, 1])
-            thisCorner = rotMat @ thisCorner0 + car.x + dt * v
-            height = terrainNoisePy(thisCorner[0])
-            steepness = dTerrainNoisedx(thisCorner[0])
-            normal = vec2(1, -1 / steepness)
-            normal /= normal.norm()
-            if (normal[1] < 0.0):
-                normal *= -1
-            normal = (normal - 0.5 * dt * v)
-            normal /= normal.norm()
-            dist = (thisCorner[1] - height) / (1 + steepness ** 2) ** 0.5
-            if (dist < 0):
-                midair = False
-                offCenterLength = np.dot(mat2(0, 1, -1, 0) @ rotMat @ thisCorner0, normal)
-                xoffset = max(0, np.exp(-abs(offCenterLength)))
-                newphi += 0.4 * dist * (1 - xoffset) / offCenterLength
-                newx -= dist * normal * xoffset
-                
+    for i in range(len(car.collisionpoints)):
+        thisCorner0 = car.collisionpoints[i]
+        thisCorner = rotMat @ thisCorner0 + car.x + dt * v
+        height = terrainNoisePy(thisCorner[0])
+        steepness = dTerrainNoisedx(thisCorner[0])
+        normal = vec2(1, -1 / steepness)
+        normal /= normal.norm()
+        if (normal[1] < 0.0):
+            normal *= -1
+        normal = (normal - 0.5 * dt * v)
+        normal /= normal.norm()
+        dist = (thisCorner[1] - height) / (1 + steepness ** 2) ** 0.5
+        if (dist < 0):
+            midair = False
+            offCenterLength = np.dot(mat2(0, 1, -1, 0) @ rotMat @ thisCorner0, normal)
+            xoffset = max(0, np.exp(-abs(offCenterLength)))
+            newphi += 0.4 * dist * (1 - xoffset) / offCenterLength
+            newx -= dist * normal * xoffset
+
     car.x = newx
     car.phi = newphi
     rotMat = genRotMatPy(-car.phi)
