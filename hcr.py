@@ -149,7 +149,7 @@ def drawCar(car_x : vec2, car_phi : float, car_wlocdiff : vec2):
         if (brelloc[0] > 0 and brelloc[1] > 0 and brelloc[0] < 1 and brelloc[1] < 1):
             brelloc.y = 1 - brelloc.y
             bodycoords = ivec2(chassis.shape * brelloc.yx)
-            col = chassis[bodycoords]
+            col = chassis[int(bodycoords.x), int(bodycoords.y)]
             if (col.a > 0.5): pixels[i, j] = col.rgb
         #wheels
         for k in ti.static(range(2)):
@@ -159,7 +159,7 @@ def drawCar(car_x : vec2, car_phi : float, car_wlocdiff : vec2):
             if (wheelloc[0] > 0 and wheelloc[0] < 1 and wheelloc[1] > 0 and wheelloc[1] < 1):
                 wheelloc.y = 1 - wheelloc.y
                 wheelcoords = ivec2(tire.shape * wheelloc.yx)
-                col = tire[wheelcoords]
+                col = tire[int(wheelcoords.x), int(wheelcoords.y)]
                 if (col.a > 0.5): pixels[i, j] = col.rgb
         #if ((relloc - car.driver).norm() < 0.3): pixels[i, j] = vec3(0, 0, 1)
 chars = uint.field(shape=(128,))
@@ -241,9 +241,9 @@ def drawEndScreen():
             tilecoords = tilecoords0 // ivec2(6, 10)
             localcoords = tilecoords0 % ivec2(6, 10)
             if (tilecoords.x < endscreentext.shape[0] and tilecoords.y < endscreentext.shape[1] and localcoords.x < 5 and localcoords.y < 6):
-                if (endscreentext[tilecoords].x != 0):
-                    coordint = (6 - localcoords.x) + 5 * (5 - localcoords.y)
-                    if ((chars[endscreentext[tilecoords].x].x >> coordint) % 2 != 0):
+                if (endscreentext[int(tilecoords.x), int(tilecoords.y)].x != 0):
+                    coordint = int((6 - localcoords.x) + 5 * (5 - localcoords.y))
+                    if ((chars[endscreentext[int(tilecoords.x), int(tilecoords.y)].x].x >> coordint) % 2 != 0):
                         pixels[i, j] = vec3(1)
 
 bounds = mat2(car.lower, car.upper)
